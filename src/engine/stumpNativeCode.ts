@@ -9,7 +9,7 @@ import { CodeFileArtifact } from './nativeEngineCode';
 
 export const STUMP_R36MAX_C_SOURCE = `/*
  * stump_r36max_engine.c — Native 720x720 handheld cockpit for the R36MAX
- * (RK3326 / dArkOS), v2.3.0-r36max.
+ * (RK3326 / dArkOS), v2.4.0-r36max.
  *
  * The Stump on the handheld is a stock Stump on a computer (SandBox_Stump_On
  * pc/stump_pc.py, set up by provisioner.py --pc). This cockpit is only its
@@ -713,7 +713,7 @@ static void scan_transports(TransportStatus *ts) {
     }
 }
 
-#define STUMP_ENGINE_VERSION "v2.3.0-r36max"
+#define STUMP_ENGINE_VERSION "v2.4.0-r36max"
 #define STUMP_ENGINE_BUILD   "2026.06.24-dArkOS"
 #define MAX_LOG_LINES 10
 #define MAX_DBG_LINES 16
@@ -2067,7 +2067,7 @@ int main(int argc, char **argv) {
     g_st.udp_sock = -1;
     g_st.ipc_sock = socket(AF_INET, SOCK_DGRAM, 0);
     load_fonts();
-    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.3.0-r36max");
+    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.4.0-r36max");
     snprintf(g_st.build_str, sizeof(g_st.build_str), "PC Stump cockpit");
     g_st.http80_ok = true;
     g_st.http8080_ok = true;
@@ -3278,9 +3278,9 @@ def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.3.0-r36max"
+            return f.read().strip() or "2.4.0-r36max"
     except OSError:
-        return "2.3.0-r36max"
+        return "2.4.0-r36max"
 
 
 FEED_VERSION = _version()
@@ -4439,7 +4439,7 @@ class Limbs:
 
 export const STUMP_R36MAX_PORTS_SCRIPT = `#!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.3.0-r36max)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.4.0-r36max)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
@@ -4470,7 +4470,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.3.0-r36max, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.4.0-r36max, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -4538,7 +4538,7 @@ echo "=== cockpit closed $(date); the Stump keeps running ===" >> "$LOG"
 
 export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.3.0-r36max)
+# install.sh — makes the R36MAX a Stump like any other (v2.4.0-r36max)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -4692,6 +4692,46 @@ else
 fi
 [ -f "$STUMP_DIR/stump_pc.py" ] || die "no Stump in $STUMP_DIR after the Provisioner"
 ok "the Stump is in $STUMP_DIR"
+
+# Its password. Team Stump's design is one: /admin takes the fserv operator
+# password (which the wizard asks) unless AUTH_ADMIN_PASSWORD is set. But the
+# wizard leaves AUTH_ADMIN_PASSWORD as SandBox_Stump_On's config.py has it
+# unless "Change any of those now?" gets a yes, and that file's isn't blank:
+# the one password then never reaches /admin. So: the repo's is cleared (or,
+# with no fserv password, one is asked over SSH), a separate one from the
+# answers file's "_admin password" is set; never printed.
+ADMIN_PY=("$STUMP_DIR/venv/bin/python" "$HERE/admin_password.py" --stump "$STUMP_DIR")
+TEMPLATE="$SANDBOX/final_firmware/config.py"
+if [ -n "$ANSWERS" ]; then
+  case "$("\${ADMIN_PY[@]}" --answers "$ANSWERS")" in
+    SET) ok "a separate /admin password is set (from the answers)" ;;
+    SHORT) warn "the /admin password in the answers is under 4 characters: not set" ;;
+  esac
+fi
+ADMIN="$("\${ADMIN_PY[@]}" --template "$TEMPLATE" state)"
+OPPW="$("\${ADMIN_PY[@]}" --key FSERVBOT_OP_PASSWORD --template "$TEMPLATE" state)"
+if [ "$ADMIN" = DEFAULT ] && [ "$OPPW" = SET ]; then
+  [ "$("\${ADMIN_PY[@]}" clear)" = SET ] && { ok "/admin takes its fserv operator password (one password; SandBox_Stump_On's was left in config.py)"; ADMIN=EMPTY; }
+fi
+if { [ "$ADMIN" = DEFAULT ] || [ "$OPPW" = DEFAULT ] || { [ "$ADMIN" = EMPTY ] && [ "$OPPW" != SET ]; }; } \\
+   && [ -z "$ANSWERS" ] && [ -t 0 ]; then
+  echo "    Its password (for /admin and the fserv bot): none of its own yet."
+  for _ in 1 2 3; do
+    read -rsp "    Its password (4+ characters): " P1; echo
+    read -rsp "    Again: " P2; echo
+    if [ "$P1" != "$P2" ]; then warn "they differ"; continue; fi
+    if [ "\${#P1}" -lt 4 ]; then warn "4 characters or more"; continue; fi
+    [ "$(printf '%s\\n' "$P1" | "\${ADMIN_PY[@]}" one)" = SET ] && { ok "its password is set"; ADMIN=EMPTY; OPPW=SET; }
+    break
+  done
+  unset P1 P2
+fi
+if [ "$ADMIN" = SET ] || [ "$OPPW" = SET ] && [ "$ADMIN" != DEFAULT ]; then
+  ok "/admin's password is its own$([ "$ADMIN" = SET ] && echo " (a separate one)" || echo " (its fserv operator password)")"
+else
+  warn "/admin's password isn't its own yet: set it (RK3326 Provisioner: This handheld's Stump -> Its password, or run this over SSH)"
+fi
+[ "$OPPW" = DEFAULT ] && warn "the fserv operator password is still SandBox_Stump_On's: set one (RK3326 Provisioner: This handheld's Stump -> Its password)"
 
 # ── 5. Walk-up extras, outside the Stump ────────────────────────────────────
 step "5/6 Ports 80 and 53 for the Stump's own Python, and the hotspot's captive DNS"
@@ -5214,7 +5254,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'stump_r36max_c',
     filename: 'stump_r36max_engine.c',
-    title: 'Cockpit engine v2.3.0-r36max (720x720, gamepad, QR)',
+    title: 'Cockpit engine v2.4.0-r36max (720x720, gamepad, QR)',
     language: 'c',
     summary:
       "The handheld's screen and gamepad: five panels (chats, board, files, network, setup). Reads /dev/shm/stump_live.txt and sends command lines to cockpit_feed.py; never touches the Stump's files or the network. The v1.8.8 KMSDRM display fixes are kept.",
@@ -5241,7 +5281,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'labuche_stump_sh',
     filename: 'LaBuche_Stump.sh',
-    title: 'EmulationStation Ports launcher v2.3.0-r36max (/roms/ports/LaBuche_Stump.sh)',
+    title: 'EmulationStation Ports launcher v2.4.0-r36max (/roms/ports/LaBuche_Stump.sh)',
     language: 'bash',
     summary:
       'Opens the cockpit on the Stump that runs in the background from boot; SELECT+START returns to EmulationStation and the Stump keeps running. No firewall flush, no NetworkManager masking.',

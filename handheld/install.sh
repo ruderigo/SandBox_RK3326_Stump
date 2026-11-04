@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.3.0-r36max)
+# install.sh — makes the R36MAX a Stump like any other (v2.4.0-r36max)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -154,6 +154,46 @@ else
 fi
 [ -f "$STUMP_DIR/stump_pc.py" ] || die "no Stump in $STUMP_DIR after the Provisioner"
 ok "the Stump is in $STUMP_DIR"
+
+# Its password. Team Stump's design is one: /admin takes the fserv operator
+# password (which the wizard asks) unless AUTH_ADMIN_PASSWORD is set. But the
+# wizard leaves AUTH_ADMIN_PASSWORD as SandBox_Stump_On's config.py has it
+# unless "Change any of those now?" gets a yes, and that file's isn't blank:
+# the one password then never reaches /admin. So: the repo's is cleared (or,
+# with no fserv password, one is asked over SSH), a separate one from the
+# answers file's "_admin password" is set; never printed.
+ADMIN_PY=("$STUMP_DIR/venv/bin/python" "$HERE/admin_password.py" --stump "$STUMP_DIR")
+TEMPLATE="$SANDBOX/final_firmware/config.py"
+if [ -n "$ANSWERS" ]; then
+  case "$("${ADMIN_PY[@]}" --answers "$ANSWERS")" in
+    SET) ok "a separate /admin password is set (from the answers)" ;;
+    SHORT) warn "the /admin password in the answers is under 4 characters: not set" ;;
+  esac
+fi
+ADMIN="$("${ADMIN_PY[@]}" --template "$TEMPLATE" state)"
+OPPW="$("${ADMIN_PY[@]}" --key FSERVBOT_OP_PASSWORD --template "$TEMPLATE" state)"
+if [ "$ADMIN" = DEFAULT ] && [ "$OPPW" = SET ]; then
+  [ "$("${ADMIN_PY[@]}" clear)" = SET ] && { ok "/admin takes its fserv operator password (one password; SandBox_Stump_On's was left in config.py)"; ADMIN=EMPTY; }
+fi
+if { [ "$ADMIN" = DEFAULT ] || [ "$OPPW" = DEFAULT ] || { [ "$ADMIN" = EMPTY ] && [ "$OPPW" != SET ]; }; } \
+   && [ -z "$ANSWERS" ] && [ -t 0 ]; then
+  echo "    Its password (for /admin and the fserv bot): none of its own yet."
+  for _ in 1 2 3; do
+    read -rsp "    Its password (4+ characters): " P1; echo
+    read -rsp "    Again: " P2; echo
+    if [ "$P1" != "$P2" ]; then warn "they differ"; continue; fi
+    if [ "${#P1}" -lt 4 ]; then warn "4 characters or more"; continue; fi
+    [ "$(printf '%s\n' "$P1" | "${ADMIN_PY[@]}" one)" = SET ] && { ok "its password is set"; ADMIN=EMPTY; OPPW=SET; }
+    break
+  done
+  unset P1 P2
+fi
+if [ "$ADMIN" = SET ] || [ "$OPPW" = SET ] && [ "$ADMIN" != DEFAULT ]; then
+  ok "/admin's password is its own$([ "$ADMIN" = SET ] && echo " (a separate one)" || echo " (its fserv operator password)")"
+else
+  warn "/admin's password isn't its own yet: set it (RK3326 Provisioner: This handheld's Stump -> Its password, or run this over SSH)"
+fi
+[ "$OPPW" = DEFAULT ] && warn "the fserv operator password is still SandBox_Stump_On's: set one (RK3326 Provisioner: This handheld's Stump -> Its password)"
 
 # ── 5. Walk-up extras, outside the Stump ────────────────────────────────────
 step "5/6 Ports 80 and 53 for the Stump's own Python, and the hotspot's captive DNS"
