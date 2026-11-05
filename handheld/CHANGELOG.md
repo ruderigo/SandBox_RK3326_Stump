@@ -35,6 +35,9 @@ SandBox_Stump_On **1.0.0-beta.55**.
 - What changes for the user: no web pages, AP, chain link or LoRa relay once
   the cockpit is closed; a remembered AP comes back when the cockpit is open.
   Over SSH, `~/Stump/start-stump.sh` / `stop-stump.sh` still work by hand.
+- The install's check says *parent … not heard yet* right after the start
+  (it said "heard Nones ago"), and no longer prints the beta.43 reminder
+  about the other Stumps every time (the warning about this one stays).
 - SandBox_Stump_On's beta.49-55 need nothing else here: the handheld's Stump
   gets the address page with both QR codes, NomadNet browsing and hubs, the
   NomadNet and Simple packs (say yes to them in the wizard, or
