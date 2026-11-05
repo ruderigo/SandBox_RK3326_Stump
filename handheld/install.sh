@@ -308,7 +308,7 @@ for port in (80, 8080):
         c = json.load(op.open("http://127.0.0.1:%d/chain.json" % port, timeout=2))
         up = (c.get("uplink") or {})
         chain = ("chain %s, %s" % (c.get("chain"), c.get("role")) +
-                 (", parent %s heard %ss ago" % (up.get("parent"), up.get("parent_heard_s")) if up else "")) if c.get("enabled") else "no chain"
+                 (", parent %s %s" % (up.get("parent"), "heard %ss ago" % up["parent_heard_s"] if up.get("parent_heard_s") is not None else "not heard yet (it just started)") if up else "")) if c.get("enabled") else "no chain"
         print("%s %s on :%d, %s" % (d.get("name"), d.get("release"), port, chain)); break
     except Exception:
         pass
@@ -327,7 +327,6 @@ REL="$(echo "$NODE" | grep -oE '1\.0\.0-beta\.[0-9]+' | head -1)"
 if [ -n "$REL" ] && [ "${REL##*.}" -lt 43 ] 2>/dev/null; then
   warn "this Stump runs $REL: 1.0.0-beta.43 or newer re-introduces it to the chain at once after a restart"
 fi
-echo "    (The others need 1.0.0-beta.43 too, LaBuche3 included: a Stump answers a restarted one only if it runs it.)"
 echo
 echo "Done. Open it from EmulationStation: Ports -> LaBuche_Stump. SELECT+START goes back."
 echo "The Stump runs only while that Port is open (nothing in the background, like a ROM):"

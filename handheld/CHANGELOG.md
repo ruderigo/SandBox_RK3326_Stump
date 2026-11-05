@@ -7,6 +7,12 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
+## Next (not released yet)
+
+- The install's check says *parent … not heard yet* right after the start
+  (it said "heard Nones ago"), and no longer prints the beta.43 reminder
+  about the other Stumps every time (the warning about this one stays).
+
 ## v2.5.0-b.55
 
 (`-b.55`: tested against SandBox_Stump_On 1.0.0-beta.55. v2.5.0-r36max was
