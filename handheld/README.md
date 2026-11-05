@@ -4,8 +4,9 @@ The R36MAX runs **the stock Stump on a computer** from
 [SandBox_Stump_On](https://github.com/ruderigo/SandBox_Stump_On):
 `pc/stump_pc.py`, set up by `provisioner.py --pc`, the same way macOS1 or any
 Linux laptop runs it. The firmware is the same and is **not modified**; the
-wizard, the start-at-login service, `/admin`, the chain, the Heltec on USB and
-the way it updates are all the same.
+wizard, `/admin`, the chain, the Heltec on USB and the way it updates are all
+the same. One difference (v2.5.0): it runs **only while its Port is open**,
+like a ROM, with no start-at-login; the launcher starts it and stops it.
 
 The only R36MAX-specific parts are the handheld's own screen and controls,
 which sit **outside** the Stump and talk to it the way any app does:
@@ -18,7 +19,7 @@ which sit **outside** the Stump and talk to it the way any app does:
                               ▼                           │
                         cockpit_feed.py  ── HTTP (public API, like a browser) ──►  the Stump
                                                                                    ~/Stump/stump_pc.py
-                                                                                   (systemd --user "stump", from boot)
+                                                                                   (started and stopped by the launcher)
 ```
 
 | File | What it is |
@@ -77,7 +78,8 @@ Provisioner asks its usual questions**. Answer them as you did for macOS1:
 - chain: *Joins another Stump's Wi-Fi* → *On the Wi-Fi it's on now* → LaBuche3's
   address → the chain's secret;
 - Heltec: *on USB* if it's plugged in;
-- start at login: **yes**.
+- start at login: **no** (the Port starts and stops it; `install.sh --answers`
+  forces this).
 
 **From the gamepad instead** (v2.3.0): the RK3326 Provisioner's *This
 handheld's Stump* asks the same things in a form on the screen and runs
@@ -92,8 +94,10 @@ that's been saved.
 ## Using it
 
 - **EmulationStation → Ports → LaBuche_Stump** opens the cockpit. **SELECT+START**
-  goes back to EmulationStation. The Stump **keeps running** in the background,
-  as it does on a computer.
+  stops the Stump and goes back to EmulationStation. Nothing of it runs in the
+  background: the handheld is a Stump while the cockpit is open (so it never
+  runs beside FireFly, which since Stump 1.0.0-beta.55 would fight it for the
+  Wi-Fi local-discovery port).
 - Its pages: `http://r36max.local/` (or the address in the cockpit's header).
   `/admin` works as on every Stump: radio, chain, plugins, turning it off.
 - **Chain secret, role, parent:** in `/admin` or with
@@ -110,7 +114,7 @@ that's been saved.
   *AP 5 GHz* (the Stump's open Wi-Fi with its sign-in page), or *Idle*.
   ←/→ chooses a job, A applies it (it asks first, and says when the handheld
   would leave its network), Y remembers it: a remembered AP comes back by
-  itself when the card is plugged in again, or at boot. Any card that supports
+  itself when the card is plugged in again while the cockpit is open. Any card that supports
   AP mode can be an AP, the Blueway included, and as many as there are cards:
   the first at `10.42.0.1` (`PC_HOTSPOT_NAME`), the next at `10.42.1.1`
   (`…-2`) and so on, each on its own channel. The Stump restarts when the APs
@@ -126,8 +130,7 @@ that's been saved.
   Stumps it shows them as `mesh-xxxx` for up to 2 minutes and lists them only at their
   half-hourly beacon: the chain works, it just looks broken. The CAM (LaBuche3) needs it too.
 - Logs: `~/Stump/stump.log` (the Stump), `/roms/ports/stump_r36max/cockpit.log` (the cockpit).
-- Stop and start the Stump: `~/Stump/stop-stump.sh` / `~/Stump/start-stump.sh`, or
-  `systemctl --user stop|start stump`.
+- By hand, outside the cockpit (over SSH): `~/Stump/start-stump.sh` / `~/Stump/stop-stump.sh`.
 
 ## The look and the keyboard (FireFly's)
 
