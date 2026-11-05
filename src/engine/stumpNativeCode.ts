@@ -9,7 +9,7 @@ import { CodeFileArtifact } from './nativeEngineCode';
 
 export const STUMP_R36MAX_C_SOURCE = `/*
  * stump_r36max_engine.c — Native 720x720 handheld cockpit for the R36MAX
- * (RK3326 / dArkOS), v2.5.0-r36max.
+ * (RK3326 / dArkOS), v2.5.0-b.55.
  *
  * The Stump on the handheld is a stock Stump on a computer (SandBox_Stump_On
  * pc/stump_pc.py, set up by provisioner.py --pc). This cockpit is only its
@@ -713,7 +713,7 @@ static void scan_transports(TransportStatus *ts) {
     }
 }
 
-#define STUMP_ENGINE_VERSION "v2.5.0-r36max"
+#define STUMP_ENGINE_VERSION "v2.5.0-b.55"
 #define STUMP_ENGINE_BUILD   "2026.06.24-dArkOS"
 #define MAX_LOG_LINES 10
 #define MAX_DBG_LINES 16
@@ -2067,7 +2067,7 @@ int main(int argc, char **argv) {
     g_st.udp_sock = -1;
     g_st.ipc_sock = socket(AF_INET, SOCK_DGRAM, 0);
     load_fonts();
-    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.5.0-r36max");
+    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.5.0-b.55");
     snprintf(g_st.build_str, sizeof(g_st.build_str), "PC Stump cockpit");
     g_st.http80_ok = true;
     g_st.http8080_ok = true;
@@ -3278,9 +3278,9 @@ def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.5.0-r36max"
+            return f.read().strip() or "2.5.0-b.55"
     except OSError:
-        return "2.5.0-r36max"
+        return "2.5.0-b.55"
 
 
 FEED_VERSION = _version()
@@ -4439,7 +4439,7 @@ class Limbs:
 
 export const STUMP_R36MAX_PORTS_SCRIPT = `#!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.0-r36max)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.0-b.55)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
@@ -4470,7 +4470,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.5.0-r36max, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.5.0-b.55, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -4545,7 +4545,7 @@ echo "=== cockpit closed $(date); the Stump stopped ===" >> "$LOG"
 
 export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.5.0-r36max)
+# install.sh — makes the R36MAX a Stump like any other (v2.5.0-b.55)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -5270,7 +5270,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'stump_r36max_c',
     filename: 'stump_r36max_engine.c',
-    title: 'Cockpit engine v2.5.0-r36max (720x720, gamepad, QR)',
+    title: 'Cockpit engine v2.5.0-b.55 (720x720, gamepad, QR)',
     language: 'c',
     summary:
       "The handheld's screen and gamepad: five panels (chats, board, files, network, setup). Reads /dev/shm/stump_live.txt and sends command lines to cockpit_feed.py; never touches the Stump's files or the network. The v1.8.8 KMSDRM display fixes are kept.",
@@ -5297,7 +5297,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'labuche_stump_sh',
     filename: 'LaBuche_Stump.sh',
-    title: 'EmulationStation Ports launcher v2.5.0-r36max (/roms/ports/LaBuche_Stump.sh)',
+    title: 'EmulationStation Ports launcher v2.5.0-b.55 (/roms/ports/LaBuche_Stump.sh)',
     language: 'bash',
     summary:
       'Opens the cockpit on the Stump that runs in the background from boot; SELECT+START returns to EmulationStation and the Stump keeps running. No firewall flush, no NetworkManager masking.',

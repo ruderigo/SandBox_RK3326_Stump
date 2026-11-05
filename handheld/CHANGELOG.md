@@ -1,11 +1,16 @@
 # R36MAX Stump: changes
 
 Each release is a git tag `v<VERSION>` (the version is in `handheld/VERSION`).
+From 2.5.0 the version ends in `-b.NN`: the SandBox_Stump_On build
+(1.0.0-beta.NN) it was tested against, as FireFly shows its build.
 Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
-## v2.5.0-r36max
+## v2.5.0-b.55
+
+(`-b.55`: tested against SandBox_Stump_On 1.0.0-beta.55. v2.5.0-r36max was
+tagged first by mistake and is the same code; this tag replaces it.)
 
 **Nothing in the background: the Stump runs while its Port is open**, like a
 ROM. Opening *Ports → LaBuche_Stump* starts the stock Stump and the cockpit;
