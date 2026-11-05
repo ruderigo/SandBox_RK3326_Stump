@@ -1,14 +1,14 @@
 #!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.4.0-r36max)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.0-r36max)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
-# pc/stump_pc.py, set up by provisioner.py --pc). It runs in the background
-# from boot as the "stump" user service, like on any computer, whether or
-# not this cockpit is open. This launcher only opens the 720x720 cockpit on
-# it, and SELECT+START brings you back to EmulationStation (the Stump keeps
-# running; turn it off from /admin or ~/Stump/stop-stump.sh).
+# pc/stump_pc.py, set up by provisioner.py --pc). Since v2.5.0 it runs only
+# while this Port is open, like a ROM: this launcher starts it, opens the
+# 720x720 cockpit on it, and SELECT+START stops both and goes back to
+# EmulationStation. Nothing of it runs in the background, so it never runs
+# beside FireFly (one Port at a time).
 #
 # Installed by handheld/install.sh from github.com/ruderigo/R36MAX-Stump.
 # =============================================================================
@@ -31,7 +31,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.4.0-r36max, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.5.0-r36max, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -52,15 +52,21 @@ pkill -TERM -x stump_r36max_engine 2>/dev/null
 sleep 0.2
 rm -f /dev/shm/stump_user_quit /dev/shm/stump_live.txt /dev/shm/stump_cmd.txt /dev/shm/stump_fb.rgba 2>/dev/null
 
-# The Stump: started if it isn't running (normally it is, since boot).
+# The Stump: started for this session (and any copy left from before, or a
+# start-at-login of v2.4 and earlier, stopped first so there's exactly one).
+STUMP_PAT="^[^ ]*python[^ ]* .*$STUMP_DIR/stump_pc\.py"
+stop_stump() {
+  as_user sh "$STUMP_DIR/stop-stump.sh" >> "$LOG" 2>&1          # /admin/poweroff: the radio off first
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$STUMP_PAT" >/dev/null || break; sleep 0.5; done
+  pkill -TERM -f "$STUMP_PAT" 2>/dev/null
+}
 if [ ! -f "$STUMP_DIR/stump_pc.py" ]; then
   echo "No Stump in $STUMP_DIR: run handheld/install.sh first." >> "$LOG"
-elif systemctl cat "stump-$USER_NAME" >/dev/null 2>&1; then
-  # dArkOS has no systemd user manager: install.sh's system service.
-  systemctl is-active --quiet "stump-$USER_NAME" || { echo "Starting stump-$USER_NAME" >> "$LOG"; $SUDO systemctl start "stump-$USER_NAME" >> "$LOG" 2>&1; }
-elif ! as_user systemctl --user is-active --quiet stump 2>/dev/null; then
-  echo "Starting the Stump (systemctl --user start stump)" >> "$LOG"
-  as_user systemctl --user start stump >> "$LOG" 2>&1 || as_user sh "$STUMP_DIR/start-stump.sh" >> "$LOG" 2>&1
+else
+  as_user systemctl --user stop stump >> "$LOG" 2>&1              # v2.4's start-at-login, if still there
+  pgrep -f "$STUMP_PAT" >/dev/null && stop_stump
+  echo "Starting the Stump for this session" >> "$LOG"
+  as_user sh -c 'cd "$1" && PYTHONUNBUFFERED=1 nohup "$1/venv/bin/python" "$1/stump_pc.py" --service >> "$1/stump.log" 2>&1 &' sh "$STUMP_DIR"
 fi
 
 # The feed: the cockpit's client of the Stump's HTTP API (cores 2-3, away from the display).
@@ -88,10 +94,11 @@ for attempt in 1 2 3; do
   sleep 1
 done
 
-# Back to EmulationStation. The Stump keeps running in the background.
+# Back to EmulationStation: the cockpit, then the Stump itself, stopped.
 pkill -TERM -f "$FEED_PAT" 2>/dev/null
 pkill -TERM -x stump_r36max_engine 2>/dev/null
+[ -f "$STUMP_DIR/stump_pc.py" ] && stop_stump
 rm -f /dev/shm/stump_user_quit /dev/shm/stump_live.txt /dev/shm/stump_cmd.txt /dev/shm/stump_fb.rgba 2>/dev/null
 sync
 printf '\033c' | $SUDO tee /dev/tty1 >/dev/null 2>&1
-echo "=== cockpit closed $(date); the Stump keeps running ===" >> "$LOG"
+echo "=== cockpit closed $(date); the Stump stopped ===" >> "$LOG"

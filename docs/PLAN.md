@@ -23,7 +23,8 @@ The on-device checks are under [Bench](#bench).
    - **Idle**: plugged in, unused.
 3. **As many APs as there are cards** (N+1 on a hub).
 4. **Remember** (a toggle per card): a remembered AP comes back by itself when
-   the card is plugged in again, or at boot, cockpit open or not. Not
+   the card is plugged in again while the cockpit is open (v2.5.0: nothing
+   runs with the cockpit closed, the APs included). Not
    remembered: the cockpit offers the job again when the card appears.
 
 ## What the handheld has today

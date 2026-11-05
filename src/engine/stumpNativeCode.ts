@@ -9,7 +9,7 @@ import { CodeFileArtifact } from './nativeEngineCode';
 
 export const STUMP_R36MAX_C_SOURCE = `/*
  * stump_r36max_engine.c — Native 720x720 handheld cockpit for the R36MAX
- * (RK3326 / dArkOS), v2.4.0-r36max.
+ * (RK3326 / dArkOS), v2.5.0-r36max.
  *
  * The Stump on the handheld is a stock Stump on a computer (SandBox_Stump_On
  * pc/stump_pc.py, set up by provisioner.py --pc). This cockpit is only its
@@ -713,7 +713,7 @@ static void scan_transports(TransportStatus *ts) {
     }
 }
 
-#define STUMP_ENGINE_VERSION "v2.4.0-r36max"
+#define STUMP_ENGINE_VERSION "v2.5.0-r36max"
 #define STUMP_ENGINE_BUILD   "2026.06.24-dArkOS"
 #define MAX_LOG_LINES 10
 #define MAX_DBG_LINES 16
@@ -2067,7 +2067,7 @@ int main(int argc, char **argv) {
     g_st.udp_sock = -1;
     g_st.ipc_sock = socket(AF_INET, SOCK_DGRAM, 0);
     load_fonts();
-    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.4.0-r36max");
+    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.5.0-r36max");
     snprintf(g_st.build_str, sizeof(g_st.build_str), "PC Stump cockpit");
     g_st.http80_ok = true;
     g_st.http8080_ok = true;
@@ -3278,9 +3278,9 @@ def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.4.0-r36max"
+            return f.read().strip() or "2.5.0-r36max"
     except OSError:
-        return "2.4.0-r36max"
+        return "2.5.0-r36max"
 
 
 FEED_VERSION = _version()
@@ -4439,15 +4439,15 @@ class Limbs:
 
 export const STUMP_R36MAX_PORTS_SCRIPT = `#!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.4.0-r36max)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.0-r36max)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
-# pc/stump_pc.py, set up by provisioner.py --pc). It runs in the background
-# from boot as the "stump" user service, like on any computer, whether or
-# not this cockpit is open. This launcher only opens the 720x720 cockpit on
-# it, and SELECT+START brings you back to EmulationStation (the Stump keeps
-# running; turn it off from /admin or ~/Stump/stop-stump.sh).
+# pc/stump_pc.py, set up by provisioner.py --pc). Since v2.5.0 it runs only
+# while this Port is open, like a ROM: this launcher starts it, opens the
+# 720x720 cockpit on it, and SELECT+START stops both and goes back to
+# EmulationStation. Nothing of it runs in the background, so it never runs
+# beside FireFly (one Port at a time).
 #
 # Installed by handheld/install.sh from github.com/ruderigo/R36MAX-Stump.
 # =============================================================================
@@ -4470,7 +4470,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.4.0-r36max, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.5.0-r36max, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -4491,15 +4491,21 @@ pkill -TERM -x stump_r36max_engine 2>/dev/null
 sleep 0.2
 rm -f /dev/shm/stump_user_quit /dev/shm/stump_live.txt /dev/shm/stump_cmd.txt /dev/shm/stump_fb.rgba 2>/dev/null
 
-# The Stump: started if it isn't running (normally it is, since boot).
+# The Stump: started for this session (and any copy left from before, or a
+# start-at-login of v2.4 and earlier, stopped first so there's exactly one).
+STUMP_PAT="^[^ ]*python[^ ]* .*$STUMP_DIR/stump_pc\\.py"
+stop_stump() {
+  as_user sh "$STUMP_DIR/stop-stump.sh" >> "$LOG" 2>&1          # /admin/poweroff: the radio off first
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f "$STUMP_PAT" >/dev/null || break; sleep 0.5; done
+  pkill -TERM -f "$STUMP_PAT" 2>/dev/null
+}
 if [ ! -f "$STUMP_DIR/stump_pc.py" ]; then
   echo "No Stump in $STUMP_DIR: run handheld/install.sh first." >> "$LOG"
-elif systemctl cat "stump-$USER_NAME" >/dev/null 2>&1; then
-  # dArkOS has no systemd user manager: install.sh's system service.
-  systemctl is-active --quiet "stump-$USER_NAME" || { echo "Starting stump-$USER_NAME" >> "$LOG"; $SUDO systemctl start "stump-$USER_NAME" >> "$LOG" 2>&1; }
-elif ! as_user systemctl --user is-active --quiet stump 2>/dev/null; then
-  echo "Starting the Stump (systemctl --user start stump)" >> "$LOG"
-  as_user systemctl --user start stump >> "$LOG" 2>&1 || as_user sh "$STUMP_DIR/start-stump.sh" >> "$LOG" 2>&1
+else
+  as_user systemctl --user stop stump >> "$LOG" 2>&1              # v2.4's start-at-login, if still there
+  pgrep -f "$STUMP_PAT" >/dev/null && stop_stump
+  echo "Starting the Stump for this session" >> "$LOG"
+  as_user sh -c 'cd "$1" && PYTHONUNBUFFERED=1 nohup "$1/venv/bin/python" "$1/stump_pc.py" --service >> "$1/stump.log" 2>&1 &' sh "$STUMP_DIR"
 fi
 
 # The feed: the cockpit's client of the Stump's HTTP API (cores 2-3, away from the display).
@@ -4527,18 +4533,19 @@ for attempt in 1 2 3; do
   sleep 1
 done
 
-# Back to EmulationStation. The Stump keeps running in the background.
+# Back to EmulationStation: the cockpit, then the Stump itself, stopped.
 pkill -TERM -f "$FEED_PAT" 2>/dev/null
 pkill -TERM -x stump_r36max_engine 2>/dev/null
+[ -f "$STUMP_DIR/stump_pc.py" ] && stop_stump
 rm -f /dev/shm/stump_user_quit /dev/shm/stump_live.txt /dev/shm/stump_cmd.txt /dev/shm/stump_fb.rgba 2>/dev/null
 sync
 printf '\\033c' | $SUDO tee /dev/tty1 >/dev/null 2>&1
-echo "=== cockpit closed $(date); the Stump keeps running ===" >> "$LOG"
+echo "=== cockpit closed $(date); the Stump stopped ===" >> "$LOG"
 `;
 
 export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.4.0-r36max)
+# install.sh — makes the R36MAX a Stump like any other (v2.5.0-r36max)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -4557,8 +4564,9 @@ export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 #   1. Packages: git, python3-venv, gcc + ALSA headers, NetworkManager, iw, pygame.
 #   2. SandBox_Stump_On in ~/SandBox_Stump_On (clone, or pull).
 #   3. The Stump in ~/Stump, by SandBox_Stump_On's own \`provisioner.py --pc\`:
-#      the same wizard, files, venv and start-at-login service as every
-#      computer Stump (docs/PC.md). Nothing in the firmware is changed.
+#      the same wizard, files and venv as every computer Stump (docs/PC.md),
+#      but no start-at-login: the Port starts and stops it (v2.5.0). Nothing
+#      in the firmware is changed.
 #   4. Two things a Linux laptop doesn't need but a walk-up handheld does,
 #      both outside the Stump: the Stump's own Python may use ports 80 and 53
 #      (a capability on its venv's python only), and the hotspot's DHCP
@@ -4666,10 +4674,11 @@ sudo mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" && sudo chown -R "$ME" "$APP_
 
 # ── 4. The Stump, exactly as on any computer ────────────────────────────────
 step "4/6 The Stump: provisioner.py --pc (the same wizard as every computer Stump)"
-# A user service that runs from boot, with or without anyone logged in.
-sudo loginctl enable-linger "$ME" && ok "user services start at boot (loginctl enable-linger $ME)"
-for _ in 1 2 3 4 5 6 7 8 9 10; do systemctl --user show-environment >/dev/null 2>&1 && break; sleep 1; done
-systemctl --user show-environment >/dev/null 2>&1 || warn "no systemd user manager yet: the Provisioner's start-at-login may fail (log out and in, or reboot, then run this again)"
+# v2.5.0: nothing runs in the background. The Stump runs only while its
+# Port is open (LaBuche_Stump.sh starts it and stops it), like a ROM: no
+# start-at-login, no boot service, no linger. One Port at a time in
+# EmulationStation also means it never runs beside FireFly (both want the
+# same local-discovery port on Wi-Fi since Stump 1.0.0-beta.55).
 # The Stump's own Python, as a real file (--copies), so the port capability
 # below applies to it alone. The Provisioner keeps a venv that's already there.
 if [ ! -x "$STUMP_DIR/venv/bin/python" ]; then
@@ -4679,14 +4688,23 @@ fi
 if [ -n "$ANSWERS" ]; then
   grep -q -- "--answers" "$SANDBOX/provisioner.py" \\
     || die "this SandBox_Stump_On is older than 1.0.0-beta.48: it can't take answers from a file (update it with internet)"
-  (cd "$SANDBOX" && python3 provisioner.py --pc "$STUMP_DIR" --answers "$ANSWERS") \\
-    || die "provisioner.py --pc --answers stopped (its message is above)"
+  # The same answers, with start-at-login forced to no (the launcher starts it).
+  NOLOGIN="$(mktemp)"; chmod 600 "$NOLOGIN"
+  python3 - "$ANSWERS" "$NOLOGIN" <<'PY' || die "can't read the answers file as JSON"
+import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+d["start this stump automatically when you log in"] = False
+json.dump(d, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False)
+PY
+  (cd "$SANDBOX" && python3 provisioner.py --pc "$STUMP_DIR" --answers "$NOLOGIN") \\
+    || { rm -f "$NOLOGIN"; die "provisioner.py --pc --answers stopped (its message is above)"; }
+  rm -f "$NOLOGIN"
 else
   echo
   echo "    The Provisioner asks its questions now. Answer them as for macOS1:"
   echo "      folder: $STUMP_DIR  ·  chain: 'Joins another Stump's Wi-Fi' -> 'On the Wi-Fi it's on now'"
   echo "      -> LaBuche3's address -> the chain's secret  ·  Heltec: 'on USB' if it's plugged in"
-  echo "      ·  start at login: yes"
+  echo "      ·  start at login: NO (the cockpit's Port starts and stops it)"
   echo
   (cd "$SANDBOX" && python3 provisioner.py --pc "$STUMP_DIR") || die "provisioner.py --pc stopped (its message is above)"
 fi
@@ -4766,13 +4784,11 @@ done
 sudo chmod 666 /dev/dri/card* /dev/dri/render* /dev/fb0 /dev/input/event* 2>/dev/null
 ok "screen and gamepad: $ME is in $(id -nG "$ME" | tr ' ' ',')"
 
-# Passwordless sudo for exactly what the cockpit does (devices, cursor, Wi-Fi,
-# restarting the Stump's service).
-SYSTEMCTL="$(command -v systemctl || echo /usr/bin/systemctl)"
+# Passwordless sudo for exactly what the cockpit does (devices, cursor, Wi-Fi).
 SUDOERS=/etc/sudoers.d/stump-r36max
 TMP="$(mktemp)"
 printf '%s\\n' "# R36MAX Stump cockpit (R36MAX-Stump/handheld/install.sh)" \\
-  "$ME ALL=(root) NOPASSWD: /usr/bin/nmcli, /usr/bin/chmod, /usr/bin/tee, /usr/sbin/iw, /usr/bin/iw, $SYSTEMCTL start stump-$ME, $SYSTEMCTL restart stump-$ME" > "$TMP"
+  "$ME ALL=(root) NOPASSWD: /usr/bin/nmcli, /usr/bin/chmod, /usr/bin/tee, /usr/sbin/iw, /usr/bin/iw" > "$TMP"
 chmod 644 "$TMP"
 VISUDO=""
 for v in "$(command -v visudo 2>/dev/null)" /usr/sbin/visudo /sbin/visudo; do [ -n "$v" ] && [ -x "$v" ] && VISUDO="$v" && break; done
@@ -4793,24 +4809,20 @@ else
 fi
 rm -f "$TMP"
 
-# How the Stump starts at boot: the Provisioner's user service when this system
-# has a user manager; otherwise (dArkOS) a system service that runs it as $ME.
-if systemctl --user is-enabled stump >/dev/null 2>&1 && systemctl --user restart stump 2>/dev/null; then
-  ok "the Stump restarted with its ports (systemd --user: stump)"
-else
-  UNIT="/etc/systemd/system/stump-$ME.service"
-  printf '%s\\n' "[Unit]" "Description=Stump ($STUMP_DIR, R36MAX-Stump/handheld/install.sh)" \\
-    "After=network-online.target" "Wants=network-online.target" "" "[Service]" "User=$ME" \\
-    "WorkingDirectory=$STUMP_DIR" "Environment=PYTHONUNBUFFERED=1" \\
-    "ExecStart=$STUMP_DIR/venv/bin/python $STUMP_DIR/stump_pc.py --service" \\
-    "Restart=on-failure" "RestartSec=5" "" "[Install]" "WantedBy=multi-user.target" | sudo tee "$UNIT" >/dev/null
-  # A copy started by hand or by the Start file, stopped first (radio off).
-  [ -x "$STUMP_DIR/stop-stump.sh" ] && sh "$STUMP_DIR/stop-stump.sh" >/dev/null 2>&1
-  pkill -TERM -f "^[^ ]*python[^ ]* .*$STUMP_DIR/stump_pc\\.py" 2>/dev/null; sleep 2
-  sudo systemctl daemon-reload && sudo systemctl enable "stump-$ME" >/dev/null 2>&1 && sudo systemctl restart "stump-$ME" \\
-    && ok "the Stump runs from boot as a system service: stump-$ME (no user manager here)" \\
-    || warn "couldn't start stump-$ME: sudo systemctl status stump-$ME"
+# Nothing at boot (v2.5.0): earlier installs' services are taken away, and
+# any running copy is stopped. The cockpit's Port starts it.
+if systemctl --user is-enabled stump >/dev/null 2>&1 || systemctl --user is-active --quiet stump 2>/dev/null; then
+  systemctl --user disable --now stump >/dev/null 2>&1 && ok "the start-at-login service is off (systemd --user: stump)"
 fi
+if sudo systemctl cat "stump-$ME" >/dev/null 2>&1; then
+  sudo systemctl disable --now "stump-$ME" >/dev/null 2>&1
+  sudo rm -f "/etc/systemd/system/stump-$ME.service" && sudo systemctl daemon-reload
+  ok "the boot service stump-$ME is gone (v2.4 and earlier ran the Stump from boot)"
+fi
+sudo loginctl disable-linger "$ME" 2>/dev/null || true
+[ -x "$STUMP_DIR/stop-stump.sh" ] && sh "$STUMP_DIR/stop-stump.sh" >/dev/null 2>&1
+pkill -TERM -f "^[^ ]*python[^ ]* .*$STUMP_DIR/stump_pc\\.py" 2>/dev/null; sleep 2
+ok "the Stump runs only while its Port is open (Ports -> LaBuche_Stump)"
 
 # ── 6. The cockpit ──────────────────────────────────────────────────────────
 step "6/6 The cockpit (720x720 screen, gamepad, Ports launcher)"
@@ -4829,7 +4841,8 @@ for ports in /roms/ports /roms2/ports; do
 done
 
 # ── check ────────────────────────────────────────────────────────────────────
-step "Check"
+step "Check (the Stump started for it, then stopped)"
+(cd "$STUMP_DIR" && PYTHONUNBUFFERED=1 nohup "$STUMP_DIR/venv/bin/python" "$STUMP_DIR/stump_pc.py" --service >>"$STUMP_DIR/stump.log" 2>&1 &)
 for _ in $(seq 1 20); do
   NODE="$(python3 - <<'PY' 2>/dev/null
 import json, urllib.request
@@ -4848,7 +4861,10 @@ PY
 )"
   [ -n "$NODE" ] && break; sleep 2
 done
-if [ -n "$NODE" ]; then ok "Stump up: $NODE"; else warn "the Stump isn't answering yet: see $STUMP_DIR/stump.log"; fi
+if [ -n "$NODE" ]; then ok "Stump up: $NODE"; else warn "the Stump isn't answering: see $STUMP_DIR/stump.log"; fi
+[ -x "$STUMP_DIR/stop-stump.sh" ] && sh "$STUMP_DIR/stop-stump.sh" >/dev/null 2>&1
+pkill -TERM -f "^[^ ]*python[^ ]* .*$STUMP_DIR/stump_pc\\.py" 2>/dev/null
+ok "stopped again; it runs while its Port is open"
 # 1.0.0-beta.43: a restarted Stump is re-introduced at once (asked by Team R36MAX;
 # SandBox_Stump_On PR #11). Older, the R36MAX names the others "mesh-xxxx" for
 # minutes after each restart, and lists them only at their half-hourly beacon.
@@ -4859,8 +4875,8 @@ fi
 echo "    (The others need 1.0.0-beta.43 too, LaBuche3 included: a Stump answers a restarted one only if it runs it.)"
 echo
 echo "Done. Open it from EmulationStation: Ports -> LaBuche_Stump. SELECT+START goes back."
-echo "The Stump runs in the background from boot, like any computer Stump:"
-echo "  log: $STUMP_DIR/stump.log    stop: $STUMP_DIR/stop-stump.sh    start: $STUMP_DIR/start-stump.sh"
+echo "The Stump runs only while that Port is open (nothing in the background, like a ROM):"
+echo "  log: $STUMP_DIR/stump.log    by hand: $STUMP_DIR/start-stump.sh / stop-stump.sh"
 echo "  update: bash $HERE/install.sh   (pulls SandBox_Stump_On, runs provisioner.py --pc again)"
 echo "  chain check: cd $SANDBOX && python3 provisioner.py --check-chain"
 `;
@@ -5254,7 +5270,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'stump_r36max_c',
     filename: 'stump_r36max_engine.c',
-    title: 'Cockpit engine v2.4.0-r36max (720x720, gamepad, QR)',
+    title: 'Cockpit engine v2.5.0-r36max (720x720, gamepad, QR)',
     language: 'c',
     summary:
       "The handheld's screen and gamepad: five panels (chats, board, files, network, setup). Reads /dev/shm/stump_live.txt and sends command lines to cockpit_feed.py; never touches the Stump's files or the network. The v1.8.8 KMSDRM display fixes are kept.",
@@ -5281,7 +5297,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'labuche_stump_sh',
     filename: 'LaBuche_Stump.sh',
-    title: 'EmulationStation Ports launcher v2.4.0-r36max (/roms/ports/LaBuche_Stump.sh)',
+    title: 'EmulationStation Ports launcher v2.5.0-r36max (/roms/ports/LaBuche_Stump.sh)',
     language: 'bash',
     summary:
       'Opens the cockpit on the Stump that runs in the background from boot; SELECT+START returns to EmulationStation and the Stump keeps running. No firewall flush, no NetworkManager masking.',

@@ -5,6 +5,38 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
+## v2.5.0-r36max
+
+**Nothing in the background: the Stump runs while its Port is open**, like a
+ROM. Opening *Ports → LaBuche_Stump* starts the stock Stump and the cockpit;
+SELECT+START stops both (the radio off first, through `/admin/poweroff` as
+`stop-stump.sh` does) and goes back to EmulationStation. Checked against
+SandBox_Stump_On **1.0.0-beta.55**.
+
+- Why now: since 1.0.0-beta.55 a computer Stump speaks Reticulum's
+  AutoInterface (Wi-Fi local discovery), the same one FireFly uses. On one
+  handheld both can't: they want the same port on the same link-local
+  address, and the first one up keeps it. With one Port at a time in
+  EmulationStation, they never run together.
+- `install.sh`: no start-at-login, no boot service, no `loginctl
+  enable-linger`. An earlier install's `stump-ark` system service and
+  `systemd --user` service are disabled and removed, and a running copy
+  stopped. With `--answers`, *start this stump automatically when you log
+  in* is forced to no. The final check starts the Stump, reads `/node.json`
+  and `/chain.json`, then stops it. The sudoers file no longer allows
+  `systemctl` (nothing to restart).
+- `LaBuche_Stump.sh`: stops any copy left from before (v2.4's start-at-login
+  too), starts the Stump for the session, and stops it on exit.
+- What changes for the user: no web pages, AP, chain link or LoRa relay once
+  the cockpit is closed; a remembered AP comes back when the cockpit is open.
+  Over SSH, `~/Stump/start-stump.sh` / `stop-stump.sh` still work by hand.
+- SandBox_Stump_On's beta.49-55 need nothing else here: the handheld's Stump
+  gets the address page with both QR codes, NomadNet browsing and hubs, the
+  NomadNet and Simple packs (say yes to them in the wizard, or
+  `install nomadnet` / `install simple` in the answers file) and opt-in LXMF
+  stamps for free. The suite, including the live test against a stock
+  beta.55 Stump, passes unchanged.
+
 ## v2.4.0-r36max
 
 **Its password reaches /admin.** Team Stump's design is one password:

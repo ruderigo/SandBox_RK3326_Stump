@@ -14,7 +14,8 @@ or laptop on its Wi-Fi.
 
 The Stump itself is the stock one from
 [SandBox_Stump_On](https://github.com/ruderigo/SandBox_Stump_On), unmodified,
-running in the background from boot. This repo adds what only the handheld
+running only while its Port is open (v2.5.0: nothing in the background,
+like a ROM). This repo adds what only the handheld
 needs: the on-screen **cockpit**, its launcher in EmulationStation, and an
 installer that sets it all up.
 
@@ -86,7 +87,7 @@ bash R36MAX-Stump-$V/handheld/install.sh
   | Folder | `~/Stump` (the default: just press Enter) |
   | Chain | *Joins another Stump's Wi-Fi* → *On the Wi-Fi it's on now* → the parent Stump's address (e.g. LaBuche3's) → the chain's secret. No chain: say so, it can be set later. |
   | Heltec | *On USB* if one is plugged in, otherwise none |
-  | Start at login | **Yes** |
+  | Start at login | **No** (the Port starts and stops it) |
 
 - It ends with a **Check** line. `Stump up: <name> 1.0.0-beta.NN on :80, chain …`
   means it worked.
@@ -96,8 +97,9 @@ bash R36MAX-Stump-$V/handheld/install.sh
 On the handheld: **EmulationStation → Ports → LaBuche_Stump**. If it isn't
 listed yet, restart EmulationStation (or the handheld).
 
-- **SELECT + START** goes back to EmulationStation. The Stump keeps running
-  in the background, and it starts by itself at every boot.
+- **SELECT + START** stops the Stump and goes back to EmulationStation.
+  Nothing runs in the background: the handheld is a Stump while the cockpit
+  is open, and it never runs beside FireFly (one Port at a time).
 - Its web pages: `http://r36max.local/` from any device on the same Wi-Fi
   (or the address in the cockpit's header). `/admin` works as on every Stump.
 - **Wi-Fi:** choose the network, and type its password, in dArkOS's own Wi-Fi
@@ -134,10 +136,11 @@ on the chat tab, just start typing. Enter sends, Esc cancels.
 | The Stump doesn't answer | `~/Stump/stump.log`; `sudo systemctl status stump-ark` |
 | Pages only on `:8080`, no sign-in pop-up on the hotspot | the installer printed `setcap failed`: run it again |
 | Other Stumps show as `mesh-xxxx` for minutes after a restart | every Stump needs SandBox_Stump_On **1.0.0-beta.43** or newer (LaBuche3 too) |
+| Sideband or NomadNet on the Wi-Fi don't find the handheld's Stump | its Wi-Fi local discovery (Stump **1.0.0-beta.55**) works while the cockpit is open; the FireFly Port on the same handheld must be closed (one Port at a time does that) |
 | The chain doesn't link | `cd ~/SandBox_Stump_On && python3 provisioner.py --check-chain` |
 | Change the chain, secret or parent | `/admin`, or `python3 ~/SandBox_Stump_On/provisioner.py --pc --reconfigure` |
 
-Stop or start the Stump by hand: `~/Stump/stop-stump.sh`, `~/Stump/start-stump.sh`.
+Over SSH, outside the cockpit: `~/Stump/start-stump.sh`, `~/Stump/stop-stump.sh`.
 
 ### Uninstall
 
