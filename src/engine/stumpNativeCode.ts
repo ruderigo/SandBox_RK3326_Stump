@@ -9,7 +9,7 @@ import { CodeFileArtifact } from './nativeEngineCode';
 
 export const STUMP_R36MAX_C_SOURCE = `/*
  * stump_r36max_engine.c — Native 720x720 handheld cockpit for the R36MAX
- * (RK3326 / dArkOS), v2.5.0-b.55.
+ * (RK3326 / dArkOS), v2.5.1-b.60.
  *
  * The Stump on the handheld is a stock Stump on a computer (SandBox_Stump_On
  * pc/stump_pc.py, set up by provisioner.py --pc). This cockpit is only its
@@ -713,7 +713,7 @@ static void scan_transports(TransportStatus *ts) {
     }
 }
 
-#define STUMP_ENGINE_VERSION "v2.5.0-b.55"
+#define STUMP_ENGINE_VERSION "v2.5.1-b.60"
 #define STUMP_ENGINE_BUILD   "2026.06.24-dArkOS"
 #define MAX_LOG_LINES 10
 #define MAX_DBG_LINES 16
@@ -2067,7 +2067,7 @@ int main(int argc, char **argv) {
     g_st.udp_sock = -1;
     g_st.ipc_sock = socket(AF_INET, SOCK_DGRAM, 0);
     load_fonts();
-    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.5.0-b.55");
+    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.5.1-b.60");
     snprintf(g_st.build_str, sizeof(g_st.build_str), "PC Stump cockpit");
     g_st.http80_ok = true;
     g_st.http8080_ok = true;
@@ -3278,9 +3278,9 @@ def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.5.0-b.55"
+            return f.read().strip() or "2.5.1-b.60"
     except OSError:
-        return "2.5.0-b.55"
+        return "2.5.1-b.60"
 
 
 FEED_VERSION = _version()
@@ -4439,7 +4439,7 @@ class Limbs:
 
 export const STUMP_R36MAX_PORTS_SCRIPT = `#!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.0-b.55)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.5.1-b.60)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
@@ -4470,7 +4470,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.5.0-b.55, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.5.1-b.60, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -4545,7 +4545,7 @@ echo "=== cockpit closed $(date); the Stump stopped ===" >> "$LOG"
 
 export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.5.0-b.55)
+# install.sh — makes the R36MAX a Stump like any other (v2.5.1-b.60)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -4704,6 +4704,7 @@ else
   echo "    The Provisioner asks its questions now. Answer them as for macOS1:"
   echo "      folder: $STUMP_DIR  ·  chain: 'Joins another Stump's Wi-Fi' -> 'On the Wi-Fi it's on now'"
   echo "      -> LaBuche3's address -> the chain's secret  ·  Heltec: 'on USB' if it's plugged in"
+  echo "      ·  admin password: required (the fserv bot: the same, Enter)"
   echo "      ·  start at login: NO (the cockpit's Port starts and stops it)"
   echo
   (cd "$SANDBOX" && python3 provisioner.py --pc "$STUMP_DIR") || die "provisioner.py --pc stopped (its message is above)"
@@ -4711,13 +4712,15 @@ fi
 [ -f "$STUMP_DIR/stump_pc.py" ] || die "no Stump in $STUMP_DIR after the Provisioner"
 ok "the Stump is in $STUMP_DIR"
 
-# Its password. Team Stump's design is one: /admin takes the fserv operator
-# password (which the wizard asks) unless AUTH_ADMIN_PASSWORD is set. But the
-# wizard leaves AUTH_ADMIN_PASSWORD as SandBox_Stump_On's config.py has it
-# unless "Change any of those now?" gets a yes, and that file's isn't blank:
-# the one password then never reaches /admin. So: the repo's is cleared (or,
-# with no fserv password, one is asked over SSH), a separate one from the
-# answers file's "_admin password" is set; never printed.
+# Its password. From SandBox_Stump_On 1.0.0-beta.58 the wizard asks /admin's
+# (required) and gives the fserv bot the same one unless told otherwise; its
+# template has no passwords of its own. Before that, /admin took the fserv
+# operator password unless AUTH_ADMIN_PASSWORD was set, but the wizard left
+# AUTH_ADMIN_PASSWORD as the repo's config.py had it (not blank) unless "Change
+# any of those now?" got a yes. So, for those releases: the repo's is cleared
+# (or, with no fserv password, one is asked over SSH), a separate one from the
+# answers file's "_admin password" is set; never printed. With beta.58+ both are
+# found set and nothing is done.
 ADMIN_PY=("$STUMP_DIR/venv/bin/python" "$HERE/admin_password.py" --stump "$STUMP_DIR")
 TEMPLATE="$SANDBOX/final_firmware/config.py"
 if [ -n "$ANSWERS" ]; then
@@ -5269,7 +5272,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'stump_r36max_c',
     filename: 'stump_r36max_engine.c',
-    title: 'Cockpit engine v2.5.0-b.55 (720x720, gamepad, QR)',
+    title: 'Cockpit engine v2.5.1-b.60 (720x720, gamepad, QR)',
     language: 'c',
     summary:
       "The handheld's screen and gamepad: five panels (chats, board, files, network, setup). Reads /dev/shm/stump_live.txt and sends command lines to cockpit_feed.py; never touches the Stump's files or the network. The v1.8.8 KMSDRM display fixes are kept.",
@@ -5296,7 +5299,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'labuche_stump_sh',
     filename: 'LaBuche_Stump.sh',
-    title: 'EmulationStation Ports launcher v2.5.0-b.55 (/roms/ports/LaBuche_Stump.sh)',
+    title: 'EmulationStation Ports launcher v2.5.1-b.60 (/roms/ports/LaBuche_Stump.sh)',
     language: 'bash',
     summary:
       'Opens the cockpit on the Stump that runs in the background from boot; SELECT+START returns to EmulationStation and the Stump keeps running. No firewall flush, no NetworkManager masking.',

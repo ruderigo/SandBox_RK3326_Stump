@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.5.0-b.55)
+# install.sh — makes the R36MAX a Stump like any other (v2.5.1-b.60)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -159,6 +159,7 @@ else
   echo "    The Provisioner asks its questions now. Answer them as for macOS1:"
   echo "      folder: $STUMP_DIR  ·  chain: 'Joins another Stump's Wi-Fi' -> 'On the Wi-Fi it's on now'"
   echo "      -> LaBuche3's address -> the chain's secret  ·  Heltec: 'on USB' if it's plugged in"
+  echo "      ·  admin password: required (the fserv bot: the same, Enter)"
   echo "      ·  start at login: NO (the cockpit's Port starts and stops it)"
   echo
   (cd "$SANDBOX" && python3 provisioner.py --pc "$STUMP_DIR") || die "provisioner.py --pc stopped (its message is above)"
@@ -166,13 +167,15 @@ fi
 [ -f "$STUMP_DIR/stump_pc.py" ] || die "no Stump in $STUMP_DIR after the Provisioner"
 ok "the Stump is in $STUMP_DIR"
 
-# Its password. Team Stump's design is one: /admin takes the fserv operator
-# password (which the wizard asks) unless AUTH_ADMIN_PASSWORD is set. But the
-# wizard leaves AUTH_ADMIN_PASSWORD as SandBox_Stump_On's config.py has it
-# unless "Change any of those now?" gets a yes, and that file's isn't blank:
-# the one password then never reaches /admin. So: the repo's is cleared (or,
-# with no fserv password, one is asked over SSH), a separate one from the
-# answers file's "_admin password" is set; never printed.
+# Its password. From SandBox_Stump_On 1.0.0-beta.58 the wizard asks /admin's
+# (required) and gives the fserv bot the same one unless told otherwise; its
+# template has no passwords of its own. Before that, /admin took the fserv
+# operator password unless AUTH_ADMIN_PASSWORD was set, but the wizard left
+# AUTH_ADMIN_PASSWORD as the repo's config.py had it (not blank) unless "Change
+# any of those now?" got a yes. So, for those releases: the repo's is cleared
+# (or, with no fserv password, one is asked over SSH), a separate one from the
+# answers file's "_admin password" is set; never printed. With beta.58+ both are
+# found set and nothing is done.
 ADMIN_PY=("$STUMP_DIR/venv/bin/python" "$HERE/admin_password.py" --stump "$STUMP_DIR")
 TEMPLATE="$SANDBOX/final_firmware/config.py"
 if [ -n "$ANSWERS" ]; then

@@ -34,6 +34,17 @@ class AdminPassword(unittest.TestCase):
         if on:
             shutil.copy(os.path.join(on, "final_firmware", "settings.py"), self.stump)
             self.template = os.path.join(on, "final_firmware", "config.py")
+            sys.path.insert(0, HERE)
+            import admin_password
+            if not admin_password.value_in(self.template):
+                # 1.0.0-beta.58 on: the template has no passwords of its own (the wizard
+                # asks /admin's, required). The repo's, left in config.py, is what
+                # releases before it did: their template, as it was.
+                with open(self.template, encoding="utf-8") as f:
+                    text = f.read()
+                self.template = os.path.join(self.d, "template.py")
+                with open(self.template, "w", encoding="utf-8") as f:
+                    f.write(text.replace("AUTH_ADMIN_PASSWORD = ''", "AUTH_ADMIN_PASSWORD = 'from-the-repo'", 1))
         else:
             with open(os.path.join(self.stump, "settings.py"), "w") as f:
                 f.write(FAKE_SETTINGS)
@@ -76,6 +87,14 @@ class AdminPassword(unittest.TestCase):
         shutil.copy(self.template, os.path.join(self.stump, "config.py"))
         self.assertEqual(self.run_tool("clear"), "SET")
         self.assertEqual(self.run_tool("--template", self.template, "state"), "EMPTY")
+
+    def test_as_the_wizard_writes_them_from_beta58(self):
+        """The wizard sets /admin's (required) and the bot's (the same by default):
+        both its own, nothing to clear."""
+        with open(os.path.join(self.stump, "config.py"), "a") as f:
+            f.write("\nAUTH_ADMIN_PASSWORD = 'one-pass'\nFSERVBOT_OP_PASSWORD = 'one-pass'\n")
+        self.assertEqual(self.run_tool("--template", self.template, "state"), "SET")
+        self.assertEqual(self.run_tool("--key", "FSERVBOT_OP_PASSWORD", "--template", self.template, "state"), "SET")
 
     def test_set_from_stdin_short_and_nothing(self):
         self.assertEqual(self.run_tool("set", stdin="abc\n"), "SHORT")

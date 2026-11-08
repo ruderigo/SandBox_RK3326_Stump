@@ -7,11 +7,25 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
-## Next (not released yet)
+## v2.5.1-b.60
 
+Tested against SandBox_Stump_On **1.0.0-beta.60**: the cockpit's feed with a
+real b60 Stump (every command, the live file, the TF card: all pass), and the
+answers the RK3326 Provisioner sends (0.3.0-beta.14) through b60's own wizard.
+
+- **b58's setup questions.** The wizard asks the admin password (/admin;
+  required) and gives the fserv bot the same one; its template has no
+  passwords of its own any more. `install.sh --answers` takes the
+  Provisioner's answers as they are (it sends b58's keys beside the old
+  ones), and the password step finds both set: nothing to clear. Over SSH,
+  the hints say the admin password is asked and required. The repo's
+  password handling stays for Stumps before b58.
 - The install's check says *parent … not heard yet* right after the start
   (it said "heard Nones ago"), and no longer prints the beta.43 reminder
   about the other Stumps every time (the warning about this one stays).
+- Tests: `test_admin_password.py` with b58+'s template (no repo password:
+  the older case kept with the template as it was), and as the wizard now
+  writes both.
 
 ## v2.5.0-b.55
 
