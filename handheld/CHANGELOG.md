@@ -7,6 +7,20 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
+## v2.5.2-b.62
+
+Tested against SandBox_Stump_On **1.0.0-beta.62** (the cockpit's feed with a
+real b62 Stump: all pass).
+
+- **Installed from the RK3326 Provisioner, sudo's password typed on its
+  screen.** With `--answers` (how the Provisioner runs it) install.sh
+  needed sudo with no password at all, and stopped otherwise. Given sudo's
+  askpass helper (the Provisioner 0.3.0-beta.16 passes one), every sudo in
+  it goes through the helper (`sudo -A`), so a 10-20 minute first install
+  outliving sudo's ticket still gets the password; a wrong one stops it
+  before anything changes. Never piped into `sudo -S`. Over SSH nothing
+  changes.
+
 ## v2.5.1-b.60
 
 Tested against SandBox_Stump_On **1.0.0-beta.60**: the cockpit's feed with a

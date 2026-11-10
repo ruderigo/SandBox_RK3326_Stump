@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.5.1-b.60)
+# install.sh — makes the R36MAX a Stump like any other (v2.5.2-b.62)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -65,8 +65,17 @@ if [ -z "${STUMP_INSTALL_PULLED:-}" ] && [ -d "$REPO/.git" ]; then
   if [ -n "$ANSWERS" ]; then STUMP_INSTALL_PULLED=1 exec bash "$HERE/install.sh" --answers "$ANSWERS"; fi
   STUMP_INSTALL_PULLED=1 exec bash "$HERE/install.sh"
 fi
-if [ -n "$ANSWERS" ]; then
-  sudo -n true 2>/dev/null || die "sudo asks for a password here: with --answers it must not (run install.sh over SSH instead)"
+# From the RK3326 Provisioner (no terminal): sudo's password typed on its screen,
+# through sudo's askpass helper. Every sudo here then goes through it (sudo -A), so
+# a long first install outliving sudo's ticket still gets its password. Never sudo -S.
+if [ -n "${SUDO_ASKPASS:-}" ] && [ ! -t 0 ]; then
+  sudo() { command sudo -A "$@"; }
+fi
+if sudo -n true 2>/dev/null; then :
+elif [ -n "${SUDO_ASKPASS:-}" ] && [ ! -t 0 ]; then
+  sudo -v || die "sudo didn't take that password: nothing was changed."
+elif [ -n "$ANSWERS" ]; then
+  die "sudo asks for a password here: with --answers it needs the RK3326 Provisioner (0.3.0-beta.16+) to give it, or run install.sh over SSH instead"
 else
   sudo -v || die "sudo is needed for packages and the hotspot settings."
 fi
