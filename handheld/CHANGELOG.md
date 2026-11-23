@@ -7,6 +7,14 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
+## v2.7.5-b.88
+
+- **Tested with Stump 1.0.0-beta.88**, the build install.sh already
+  fetches (SandBox_Stump_On's `main`). Nothing else changes. Beta.88 dates a
+  board Stump's message lines in Unix time: the handheld's Stump is a
+  computer Stump, already right, and the cockpit shows no message times.
+  Beta.87 (Stump OS on a Raspberry Pi) changes nothing for the handheld.
+
 ## v2.7.4-b.87
 
 - **A message chime.** The cockpit made no sound when a message arrived.
