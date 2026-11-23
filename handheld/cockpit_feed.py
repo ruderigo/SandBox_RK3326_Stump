@@ -50,9 +50,9 @@ def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.7.4-b.87"
+            return f.read().strip() or "2.7.5-b.88"
     except OSError:
-        return "2.7.4-b.87"
+        return "2.7.5-b.88"
 
 
 FEED_VERSION = _version()
