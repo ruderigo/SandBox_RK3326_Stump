@@ -39,7 +39,7 @@ Stump while the cockpit is open.
 | FILES | Its file shelf |
 | NETWORK | The handheld's Wi-Fi cards and their jobs |
 | SETUP | The Stump's log and its chain |
-| OWNER | Owner tools: rooms, people, settings, the admin password, and this handheld's sound |
+| OWNER | Owner tools: rooms, people, settings, the admin password, its packs, its identity, and this handheld's sound |
 
 ## The buttons
 

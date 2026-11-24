@@ -301,7 +301,7 @@ class Commands(unittest.TestCase):
     def test_no_password_one_can_be_typed_or_made(self):
         feed = self.feed("NODE_NAME = 'x'\n")
         _, _, rows = feed.form_rows()
-        self.assertEqual([r["key"] for r in rows], ["", "setpw", "makepw", "", "chimes", "msgchime"])
+        self.assertEqual([r["key"] for r in rows], ["", "setpw", "makepw", "packs", "identity", "stamps", "", "chimes", "msgchime"])
         self.assertEqual(rows[1]["value"], "")                                    # never shown on the row
 
     def stump_with_settings(self, cfg):
@@ -407,6 +407,123 @@ class Sound(unittest.TestCase):
             f.write("{nope")
         self.assertEqual(F.Feed().sound, {"chimes": True, "msg": "dms"})
 
+
+
+class PacksAndIdentity(unittest.TestCase):
+    """OWNER: its packs, identity and stamps, by Team Stump's code (stump_team,
+    pretended here; tests/test_stump_team.py runs the real one)."""
+
+    def feed(self, answers):
+        feed = F.Feed()
+        feed.admin_pw = lambda: ""                     # these need no admin password
+        self.calls = []
+        real = F.stump_team.team
+
+        def team(do, folder, **job):
+            self.calls.append((do, job))
+            return answers[do]
+        F.stump_team.team = team
+        self.addCleanup(setattr, F.stump_team, "team", real)
+        return feed
+
+    def wait(self, feed):
+        import time
+        end = time.time() + 5
+        while feed.team_busy and time.time() < end:
+            time.sleep(0.02)
+        self.assertEqual(feed.team_busy, "")
+
+    ROWS = [{"name": "tavern", "here": "1.0", "state": "update", "plugins": ["tavern"], "version": "1.1",
+             "about": "A tavern", "keeps": {"tools": 1}},
+            {"name": "rnfs", "here": None, "state": "new", "plugins": ["rnfs"], "version": "0.3", "about": "",
+             "keeps": {}},
+            {"name": "mine", "here": "?", "state": "yours", "plugins": ["mine"], "version": None, "about": "",
+             "keeps": {}}]
+
+    def test_on_owner_with_or_without_a_password(self):
+        feed = self.feed({})
+        keys = [r["key"] for r in feed.form_rows()[2]]
+        self.assertIn("packs", keys)
+        self.assertIn("identity", keys)
+        feed.admin_pw = lambda: "pw"
+        self.assertIn("stamps", [r["key"] for r in feed.form_rows()[2]])
+
+    def test_its_packs_install_update_remove(self):
+        feed = self.feed({"packs": {"rows": self.ROWS}, "install": {"ok": True, "rows": self.ROWS},
+                          "remove": {"ok": True, "rows": self.ROWS[1:]}})
+        feed.open_form("packs")
+        self.wait(feed)
+        title, parent, rows = feed.form_rows()
+        self.assertEqual((title, parent), ("Its packs", "owner"))
+        self.assertEqual([(r["key"], r["options"]) for r in rows[:3]],
+                         [("pk:tavern", ["\u2014", "update", "remove", "remove + its data"]),
+                          ("pk:rnfs", ["\u2014", "install"]),
+                          ("pk:mine", ["\u2014", "remove", "remove + its data"])])
+        self.assertTrue(all(r["ask"] for r in rows[:3]))
+        feed.form_set("packs", "pk:rnfs", "0")          # "—": nothing
+        self.assertEqual(len(self.calls), 1)
+        feed.form_set("packs", "pk:tavern", "1")
+        self.wait(feed)
+        self.assertEqual(self.calls[-1], ("install", {"name": "tavern", "timeout": 300}))
+        self.assertIn("tavern 1.1 is on the Stump", feed.replies[0])
+        self.assertEqual(feed.want_restart, "Updating tavern")       # the loop restarts the Stump
+        feed.want_restart = ""
+        feed.form_set("packs", "pk:tavern", "3")
+        self.wait(feed)
+        self.assertEqual(self.calls[-1], ("remove", {"name": "tavern", "also": True, "timeout": 300}))
+        self.assertIn("with its saved data, its Tools page section", feed.replies[0])
+        self.assertEqual([r["name"] for r in feed.pack_list], ["rnfs", "mine"])
+
+    def test_one_job_at_a_time_and_errors_said(self):
+        feed = self.feed({"packs": {"old": "1.0.0-beta.75"}})
+        feed.team_busy = "something"
+        feed.open_form("packs")
+        self.assertIn("Still working", feed.busy_msg)
+        self.assertEqual(self.calls, [])
+        feed.team_busy = ""
+        feed.open_form("packs")
+        self.wait(feed)
+        self.assertIn("older than 1.0.0-beta.75", feed.replies[0])
+        self.assertEqual(feed.want_restart, "")
+
+    def test_its_identity_saved_and_brought_back(self):
+        d = tempfile.mkdtemp()
+        keep = os.path.join(d, "LaBuche.stump-identity")
+        open(keep, "w").close()
+        feed = self.feed({"save": {"path": os.path.join(d, "x.stump-identity"), "fingerprint": "ab12"},
+                          "restore": {"name": "LaBuche", "fingerprint": "cd34", "kept": "/k/old.stump-identity"}})
+        real_k, real_d = F.stump_team.keepsakes, F.stump_team.keep_dir
+        F.stump_team.keepsakes = lambda: [keep]
+        F.stump_team.keep_dir = lambda: d
+        self.addCleanup(setattr, F.stump_team, "keepsakes", real_k)
+        self.addCleanup(setattr, F.stump_team, "keep_dir", real_d)
+        feed.open_form("identity")
+        title, parent, rows = feed.form_rows()
+        self.assertEqual([r["key"] for r in rows], ["idsave", "idload:0"])
+        feed.form_set("identity", "idsave", "1")
+        self.wait(feed)
+        self.assertEqual(self.calls[-1], ("save", {"dir": d, "timeout": 300}))
+        self.assertIn("fingerprint ab12", feed.replies[0])
+        self.assertEqual(feed.want_restart, "")                      # saving changes nothing
+        feed.form_set("identity", "idload:0", "1")
+        self.wait(feed)
+        self.assertEqual(self.calls[-1], ("restore", {"src": keep, "keep": d, "timeout": 300}))
+        self.assertIn("It's LaBuche again", feed.replies[0])
+        self.assertTrue(feed.want_restart)
+
+    def test_where_identity_files_go_on_both_systems(self):
+        import stump_team as T
+        d = tempfile.mkdtemp()
+        data, home = os.path.join(d, "data", "ark"), os.path.join(d, "home")
+        os.makedirs(home)
+        self.assertEqual(T.keep_dir(data, home), home)              # dArkOS / arkos4clone: no /data/ark
+        os.makedirs(data)
+        self.assertEqual(T.keep_dir(data, home), data)              # RK3326 Linux: its data partition
+        for p in (os.path.join(home, "a.stump-identity"), os.path.join(data, "b.stump-identity"),
+                  os.path.join(home, "notes.txt")):
+            open(p, "w").close()
+        self.assertEqual(sorted(os.path.basename(p) for p in T.keepsakes([data, home], home)),
+                         ["a.stump-identity", "b.stump-identity"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

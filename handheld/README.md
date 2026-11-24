@@ -140,6 +140,17 @@ that's been saved.
   - *People in the room*: op, mod, kick, mute, ban and back, in that room or
     every room of the Stump; who's op or mod, who's banned or muted.
   - *Announce now*, *Restart the Stump*.
+  - *Its packs* (v2.7.6): every pack its SandBox_Stump_On offers and every
+    one it has: install, update, remove (keeping what it saved, or with it).
+    *Its identity*: save it to a `.stump-identity` file, or bring a saved one
+    back (the one it has is saved first). *Work out its announce stamps*.
+    These need no admin password: they're Team Stump's own code
+    (`stump_team.py` calls its `provisioner.py`, 1.0.0-beta.75 and on), and
+    the Stump restarts after a change. Identity files go to `/data/ark` on
+    RK3326 Linux (it survives a reflash), else your home folder; never the
+    games card (it keeps no file permissions). They're found there, and on
+    the card when you copied one onto it. (The RK3326 Provisioner did these
+    until its beta.23; it's a board bench now.)
   ↑/↓ moves, ←/→ picks, A applies (what changes the Stump asks first), B
   goes back. The rest of `/admin` (radio, chain, plugins, themes, layout,
   profiles) from a phone on its hotspot.

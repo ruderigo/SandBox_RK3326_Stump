@@ -7,6 +7,25 @@ Pushing the tag runs the tests and publishes a GitHub release with
 `R36MAX-Stump-handheld-<VERSION>.tar.gz`, its `SHA256SUMS`, and the section
 below as its notes.
 
+## v2.7.6-b.88
+
+- **Its packs, identity and announce stamps, on OWNER**, where the RK3326
+  Provisioner had them (it's a board bench from its beta.23):
+  - *Its packs*: every pack its SandBox_Stump_On offers and every one it
+    has, each with what A can do: install, install again, update, remove,
+    remove with its data. It asks first; the Stump restarts after.
+  - *Its identity*: *Save its identity* (a `.stump-identity` file, never over
+    another), *Bring back* a saved one (the one it has is saved first).
+  - *Work out its announce stamps* (Reticulum 1.6.1's proof of work).
+  All by Team Stump's own code (`stump_team.py` runs its `provisioner.py`'s
+  functions with the Stump's own Python), one job at a time in the
+  background; no admin password needed. An older SandBox_Stump_On is said
+  so ("update the Stump first").
+- **The same on both systems**: dArkOS / arkos4clone and RK3326 Linux.
+  Identity files go to RK3326 Linux's `/data/ark` (it survives a reflash),
+  else the home folder, never the games card (exFAT keeps no permissions);
+  they're found there and on the card.
+
 ## v2.7.5-b.88
 
 - **Tested with Stump 1.0.0-beta.88**, the build install.sh already

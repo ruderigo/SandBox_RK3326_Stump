@@ -72,6 +72,9 @@ run "install options" install_options
 step "The feed (unit tests)"
 run "feed" python3 -I "$HERE/test_cockpit_feed.py"
 
+step "Its packs and identity (stump_team.py${1:+, with $1})"
+run "team" env ${1:+STUMP_ON="$1"} python3 -I -W error::ResourceWarning "$HERE/tests/test_stump_team.py"
+
 step "The Wi-Fi cards (limbs.py, with a fake /sys and NetworkManager)"
 run "limbs" python3 -I -W error::ResourceWarning "$HERE/test_limbs.py"
 
