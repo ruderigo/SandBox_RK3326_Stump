@@ -9,7 +9,7 @@ import { CodeFileArtifact } from './nativeEngineCode';
 
 export const STUMP_R36MAX_C_SOURCE = `/*
  * stump_r36max_engine.c — Native 720x720 handheld cockpit for the R36MAX
- * (RK3326 / dArkOS), v2.7.5-b.88.
+ * (RK3326 / dArkOS), v2.7.6-b.88.
  *
  * The Stump on the handheld is a stock Stump on a computer (SandBox_Stump_On
  * pc/stump_pc.py, set up by provisioner.py --pc). This cockpit is only its
@@ -715,7 +715,7 @@ static void scan_transports(TransportStatus *ts) {
     }
 }
 
-#define STUMP_ENGINE_VERSION "v2.7.5-b.88"
+#define STUMP_ENGINE_VERSION "v2.7.6-b.88"
 #define STUMP_ENGINE_BUILD   "2026.06.24-dArkOS"
 #define MAX_LOG_LINES 60      /* a room's scrollback: all the Stump keeps (MAX_MESSAGES_PER_ROOM) */
 #define MAX_ITEMS 20          /* notices and files listed (scrolled) */
@@ -2653,7 +2653,7 @@ int main(int argc, char **argv) {
     g_st.udp_sock = -1;
     g_st.ipc_sock = socket(AF_INET, SOCK_DGRAM, 0);
     load_fonts();
-    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.7.5-b.88");
+    snprintf(g_st.ver_str, sizeof(g_st.ver_str), "v2.7.6-b.88");
     snprintf(g_st.build_str, sizeof(g_st.build_str), "PC Stump cockpit");
     g_st.http80_ok = true;
     g_st.http8080_ok = true;
@@ -4088,15 +4088,19 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # limbs.py, next to this file (also under -I)
 import limbs  # noqa: E402
+try:
+    import stump_team  # noqa: E402  (its packs, identity, stamps: Team Stump's code)
+except ImportError:                    # an older install.sh left it out: those rows say so
+    stump_team = None
 
 
 def _version():
     """handheld/VERSION, the one place the release is written (package.sh, the tests)."""
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
-            return f.read().strip() or "2.7.5-b.88"
+            return f.read().strip() or "2.7.6-b.88"
     except OSError:
-        return "2.7.5-b.88"
+        return "2.7.6-b.88"
 
 
 FEED_VERSION = _version()
@@ -4526,6 +4530,13 @@ class Feed:
         self.verified = None               # the identity hash the Stump verified it as
         self.next_auth = self.next_auth_check = 0.0
         self.ipc = None
+        # Its packs, identity and stamps (OWNER), by Team Stump's code, one job at
+        # a time in the background: what's running, its packs as last read, the
+        # saved identities offered, and a Stump restart it asks the loop for.
+        self.team_busy = ""
+        self.pack_list = None              # Team Stump's pack rows, once read
+        self.id_files = []
+        self.want_restart = ""
 
     # -- status line on the cockpit --
     def busy(self, msg, secs=2.5):
@@ -4924,13 +4935,75 @@ class Feed:
 
     # -- the OWNER tab: the Stump's owner on their own handheld --
     def open_form(self, fid):
-        if fid not in ("owner", "setup", "rooms", "people"):
+        if fid not in ("owner", "setup", "rooms", "people", "packs", "identity"):
             return
         self.form, self.replies = fid, []
         if fid == "setup":
             self.fetch_setup()
         elif fid == "rooms":
             self.next_rooms = 0
+        elif fid == "packs":
+            self.team_job("packs", "Reading its packs")
+
+    # -- its packs, identity, stamps: Team Stump's own code (stump_team.py) --
+    def team_job(self, do, title, done=None, restart=False, timeout=300, **job):
+        """Team Stump's code on this handheld's Stump, in the background (one
+        job at a time): done(result) -> the line to show; packs read back
+        refresh the packs page; restart: the Stump restarts after (the loop)."""
+        if stump_team is None:
+            self.busy("stump_team.py isn't next to the feed: run the Stump's install again", 5)
+            return
+        if self.team_busy:
+            self.busy("Still working: %s" % self.team_busy, 3)
+            return
+        self.team_busy = title
+        self.busy(title + "\\u2026", 600)
+
+        def work():
+            try:
+                r = stump_team.team(do, STUMP_DIR, timeout=timeout, **job)
+            except Exception as e:
+                r = {"error": "%s: %s" % (type(e).__name__, e)}
+            if "rows" in r:
+                self.pack_list = r["rows"]
+            if r.get("old"):
+                msg = "Its SandBox_Stump_On is older than %s: update the Stump first" % r["old"]
+            elif r.get("error"):
+                msg = r["error"]
+            elif not r.get("ok", True):
+                msg = "Not all of it went through: try again"
+            else:
+                msg = done(r) if done else title + ": done"
+                if restart:
+                    self.want_restart = title
+            if msg:
+                self.replies = [msg]
+                log("OWNER", msg)
+            self.team_busy = ""
+            self.busy(msg or title, 6)
+        import threading
+        threading.Thread(target=work, daemon=True).start()
+
+    @staticmethod
+    def pack_choices(r):
+        """What A can do to a pack: [(label, job)], the first is nothing."""
+        out = [("\\u2014", None)]
+        if r["version"] is not None:
+            out.append(({"new": "install", "same": "install again", "update": "update"}.get(r["state"], "install"),
+                        "install"))
+        if r["here"] is not None:
+            out += [("remove", "remove"), ("remove + its data", "purge")]
+        return out
+
+    def team_rows(self, row):
+        """OWNER's rows for its packs, identity and announce stamps."""
+        have = [r for r in self.pack_list or [] if r["here"] is not None]
+        return [row("packs", "open", "Its packs",
+                    hint=("%d on it: %s" % (len(have), ", ".join(r["name"] for r in have)[:40]) if self.pack_list
+                          is not None else "install, update, remove (Team Stump's packs)")),
+                row("identity", "open", "Its identity", hint="save it to a file, or bring a saved one back"),
+                row("stamps", "action", "Work out its announce stamps", ask=1,
+                    hint="Reticulum 1.6.1's proof of work: a minute or more each")]
 
     def admin_page(self, path="/admin", body=None):
         """An /admin page, logged in with the owner's password (a session, as
@@ -4970,6 +5043,50 @@ class Feed:
                 if MSG_CHIMES[n] != "off":
                     self.chime_seq += 1                # hear it
             self.save_sound()
+            return
+        if fid == "owner" and key == "stamps":
+            def stamped(r):
+                if not r.get("total"):
+                    return "No announces to stamp: tick Announce stamps in its /admin first"
+                if not r.get("todo"):
+                    return "Its %d announce stamp(s) are all there" % r["total"]
+                return "%d announce stamp(s) worked out" % r["todo"]
+            self.team_job("stamps", "Working out its announce stamps", stamped, timeout=3600)
+            return
+        if fid == "packs":
+            r = next((x for x in self.pack_list or [] if "pk:" + x["name"] == key), None)
+            try:
+                label, job = self.pack_choices(r)[int(value)] if r else ("", None)
+            except (ValueError, IndexError):
+                job = None
+            if job == "install":
+                self.team_job("install", "%s %s" % ("Updating" if r["here"] is not None else "Adding", r["name"]),
+                              lambda res: "%s %s is on the Stump" % (r["name"], r["version"]), restart=True,
+                              name=r["name"])
+            elif job in ("remove", "purge"):
+                also = job == "purge"
+                self.team_job("remove", "Removing %s" % r["name"],
+                              lambda res: "%s is off the Stump%s" % (r["name"], ", with %s" % stump_team.keeps_text(r)
+                                                                      if also else "; %s stays" % stump_team.keeps_text(r)),
+                              restart=True, name=r["name"], also=also)
+            return
+        if fid == "identity":
+            if key == "idsave":
+                where = stump_team.keep_dir() if stump_team else HOME
+                self.team_job("save", "Saving its identity",
+                              lambda res: "Saved: %s (fingerprint %s). Keep it safe, don't share it" % (
+                                  res["path"], res["fingerprint"]), dir=where)
+            elif key.startswith("idload:"):
+                try:
+                    src = self.id_files[int(key[7:])]
+                except (ValueError, IndexError):
+                    return
+                where = stump_team.keep_dir() if stump_team else HOME
+                self.team_job("restore", "Bringing back %s" % os.path.basename(src),
+                              lambda res: "It's %s again (fingerprint %s).%s" % (
+                                  res.get("name") or "that Stump", res["fingerprint"],
+                                  " The one it had: %s" % res["kept"] if res.get("kept") else ""),
+                              restart=True, src=src, keep=where)
             return
         if not pw:
             self.busy("No admin password on this Stump", 3)
@@ -5060,6 +5177,35 @@ class Feed:
         def row(key, kind, label, value="", options=(), sel=0, ask=False, mx=0, hint=""):
             return {"key": key, "kind": kind, "label": label, "value": value, "options": list(options), "sel": sel,
                     "ask": ask, "max": mx, "hint": hint}
+        if self.form == "packs":
+            rows = []
+            if self.pack_list is None:
+                rows.append(row("", "info", self.team_busy or "Reading its packs\\u2026"))
+            for r in (self.pack_list or [])[:20]:
+                ch = self.pack_choices(r)
+                state = {"new": "not on it", "same": "up to date", "update": "an update", "yours": "not among these"
+                         }.get(r["state"], r["state"])
+                rows.append(row("pk:" + r["name"], "choice", "%s %s" % (r["name"], r["version"] or ""), state,
+                                [c[0] for c in ch], 0, ask=True,
+                                hint=("on it: %s  \\u00b7  " % (r["here"] or "?") if r["here"] is not None else "")
+                                + (r["about"] or ", ".join(r["plugins"]))))
+            if self.pack_list == []:
+                rows.append(row("", "info", "No packs in its SandBox_Stump_On, none on it"))
+            rows += [row("", "info", x) for x in self.replies]
+            return "Its packs", "owner", rows
+        if self.form == "identity":
+            self.id_files = stump_team.keepsakes()[:12] if stump_team else []
+            where = stump_team.keep_dir() if stump_team else HOME
+            rows = [row("idsave", "action", "Save its identity", ask=1,
+                        hint="its keys into a file in %s: keep it safe" % where)]
+            for i, path in enumerate(self.id_files):
+                rows.append(row("idload:%d" % i, "action", "Bring back " + os.path.basename(path), ask=1,
+                                hint="%s  \\u00b7  the one it has is saved first" % os.path.dirname(path)))
+            if not self.id_files:
+                rows.append(row("", "info", "No saved identity to bring back",
+                                hint="a .stump-identity file in %s, your home or the card" % where))
+            rows += [row("", "info", x) for x in self.replies]
+            return "Its identity", "owner", rows
         room = self.stump.room or self.want_room
         pw = self.admin_pw()
         if not pw:
@@ -5069,7 +5215,8 @@ class Feed:
                 row("setpw", "text", "Set the admin password", mx=64,
                     hint="type your own: 4 characters or more, no spaces"),
                 row("makepw", "action", "Make one for me", ask=1,
-                    hint="the cockpit fills it in for you; shown here when you need it on a phone")] + self.sound_rows(row)
+                    hint="the cockpit fills it in for you; shown here when you need it on a phone")] + \\
+                self.team_rows(row) + self.sound_rows(row)
         if self.form == "setup":
             rows, seen = [], set()
             for c in self.setup or []:
@@ -5141,6 +5288,7 @@ class Feed:
                 hint="type the new one: 4 characters or more, no spaces"),
             row("announce", "action", "Announce now", ask=True, hint="its address and beacon, at once"),
             row("restart", "action", "Restart the Stump", ask=True, hint="settings that wait for a restart"),
+        ] + self.team_rows(row) + [
             row("", "info", "The rest: /admin on a phone",
                 hint="on its hotspot: the radio, the chain, plugins, themes, layout..."),
         ] + self.sound_rows(row)
@@ -5633,6 +5781,9 @@ class Feed:
             if now >= self.next_net:
                 self.refresh_net()
                 self.next_net = now + NET_S
+            if self.want_restart:
+                why, self.want_restart = self.want_restart, ""
+                self.restart_stump(why)
             self.poll()
             if now >= self.next_rooms and self.stump.port is not None:
                 try:
@@ -6051,7 +6202,7 @@ class Limbs:
 
 export const STUMP_R36MAX_PORTS_SCRIPT = `#!/bin/bash
 # =============================================================================
-# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.7.5-b.88)
+# LaBuche_Stump.sh — the R36MAX Stump cockpit (v2.7.6-b.88)
 # EmulationStation Ports launcher: /roms/ports/LaBuche_Stump.sh
 #
 # The Stump itself is a stock Stump on a computer (SandBox_Stump_On,
@@ -6082,7 +6233,7 @@ APP_DIR="/roms/ports/stump_r36max"               # on the TF card: drop/, tf_bac
 STUMP_DIR="$USER_HOME/Stump"
 LOG="$APP_DIR/cockpit.log"
 mkdir -p "$APP_DIR/drop" "$APP_DIR/tf_backup" 2>/dev/null
-echo "=== R36MAX Stump cockpit v2.7.5-b.88, $(date) ===" > "$LOG"
+echo "=== R36MAX Stump cockpit v2.7.6-b.88, $(date) ===" > "$LOG"
 # For diagnosing a black screen: who we are, and whether we can open the display.
 { echo "user: $(id)"; ls -l /dev/dri/ /dev/fb0 /dev/tty1 2>&1; } >> "$LOG"
 
@@ -6157,7 +6308,7 @@ echo "=== cockpit closed $(date); the Stump stopped ===" >> "$LOG"
 
 export const STUMP_R36MAX_INSTALL_SH = `#!/bin/bash
 # =============================================================================
-# install.sh — makes the R36MAX a Stump like any other (v2.7.5-b.88)
+# install.sh — makes the R36MAX a Stump like any other (v2.7.6-b.88)
 #
 # Run ON THE HANDHELD, as ark, with internet (once, for packages):
 #   git clone https://github.com/ruderigo/R36MAX-Stump ~/R36MAX-Stump
@@ -6452,7 +6603,7 @@ ok "the Stump runs only while its Port is open (Ports -> LaBuche_Stump)"
 step "6/6 The cockpit (720x720 screen, gamepad, Ports launcher)"
 mkdir -p "$COCKPIT_DIR"
 cp -f "$HERE/cockpit_feed.py" "$HERE/limbs.py" "$HERE/stump_pygame_display.py" "$HERE/stump_r36max_engine.c" \\
-      "$HERE/cockpit_font.bin" "$HERE/FONT_LICENSE" "$HERE/admin_password.py" "$HERE/cockpit_auth.py" "$COCKPIT_DIR/"
+      "$HERE/cockpit_font.bin" "$HERE/FONT_LICENSE" "$HERE/admin_password.py" "$HERE/cockpit_auth.py" "$HERE/stump_team.py" "$COCKPIT_DIR/"
 ok "FireFly's font (DejaVu Sans Mono) next to the engine"
 CFLAGS="-O2 -Wall -Wno-format-truncation"
 grep -qi "cortex-a35\\|rk3326" /proc/device-tree/compatible /proc/cpuinfo 2>/dev/null && CFLAGS="$CFLAGS -mcpu=cortex-a35"
@@ -6906,7 +7057,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'stump_r36max_c',
     filename: 'stump_r36max_engine.c',
-    title: 'Cockpit engine v2.7.5-b.88 (720x720, gamepad, QR)',
+    title: 'Cockpit engine v2.7.6-b.88 (720x720, gamepad, QR)',
     language: 'c',
     summary:
       "The handheld's screen and gamepad: five panels (chats, board, files, network, setup). Reads /dev/shm/stump_live.txt and sends command lines to cockpit_feed.py; never touches the Stump's files or the network. The v1.8.8 KMSDRM display fixes are kept.",
@@ -6933,7 +7084,7 @@ export const STUMP_CODE_ARTIFACTS: CodeFileArtifact[] = [
   {
     id: 'labuche_stump_sh',
     filename: 'LaBuche_Stump.sh',
-    title: 'EmulationStation Ports launcher v2.7.5-b.88 (/roms/ports/LaBuche_Stump.sh)',
+    title: 'EmulationStation Ports launcher v2.7.6-b.88 (/roms/ports/LaBuche_Stump.sh)',
     language: 'bash',
     summary:
       'Opens the cockpit on the Stump that runs in the background from boot; SELECT+START returns to EmulationStation and the Stump keeps running. No firewall flush, no NetworkManager masking.',
